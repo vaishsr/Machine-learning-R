@@ -1,0 +1,220 @@
+---
+title: "StatLinearModel_homework3"
+NetID: vs534
+output:
+  html_document: default
+  word_document: default
+Author: Vaishnavi Sridhar
+---
+
+#Loading the dataset in to the R studio:
+```{r}
+library(faraway)
+data(dvisits)
+```
+#Structure and summary of the dataset:
+```{r}
+str(dvisits)
+summary(dvisits)
+```
+Looking at the data distribution:
+```{r}
+library(rcompanion)
+plotNormalHistogram(dvisits)
+```
+
+Looks like the distribution of the data is right Skewed. Performing the regression with the skewed data may cause problems with the analysis. The results might not be accurate. So we will apply the common transformations for right-skewed data:  square root, cube root, and log.  The square root transformation improves the distribution of the data.
+
+```{r}
+#taking square root transformation
+dvisit_sqrt = sqrt(dvisits)
+plotNormalHistogram(dvisit_sqrt)
+```
+```{r}
+#taking cube root transformation
+dvisits_cub = sign(dvisits) * abs(dvisits)^(1/3)
+plotNormalHistogram(dvisits_cub)
+```
+
+The cube root transformation is stronger than the square root transformation.Here we are trying to transform the entire dataset as it involves multiple attributes. This also fix the non constant variance issue. The dvisist dataset when modelled with the right skewed distribution produced the non constant variance.Below is the plot for the non constant variance of the input data.
+```{r}
+skewed_model  <- lm(hospdays ~   freerepa + actdays + hospadmi+ chcond2 +age , data = dvisits)
+summary(skewed_model)
+
+```
+```{r}
+plot(fitted(skewed_model), residuals(skewed_model), xlab = "Fitted", ylab = "Residuals")
+abline(h = 0)
+```
+
+The above figure shows that there is no constant variance and our model also does not give a good R squared value. That is why, we are taking the cube root transformation of the dataset to achieve a better model.
+
+Now let us perform the data cleaning and preprocessing
+```{r}
+#checking for missing values
+sum(is.na(dvisits_cub))
+```
+
+```{r}
+#checking for multicollinearity
+summary(dvisits_cub)
+vif(dvisits_cub)
+?dvisits
+```
+
+Checking for the multicollinearity using the Variance Inflation Factor has given the above result. We have eliminate the varibles which are highly correlated. VIF value of greater than 10 said to be sufferring from multicollinearity.
+```{r}
+#removing the highly collinear features
+
+dvisit_newdata <- dvisits_cub[, -3]
+dvisit_newdata <- dvisit_newdata[, -16]
+summary(dvisit_newdata)
+```
+
+After removing the highly correlated variables, check for the mulicollinearity again to ensure all the variables are in the lower VIF range.
+```{r}
+vif(dvisit_newdata)
+```
+
+In order to perform the regression, we will consider only the variables which are signficant and that has p value less than 0.05. To achieve this we can do varible selection.
+
+Variable selection involves three methods - Forward, Backward and Both. We have to consider the model with the
+lesser AIC value.
+
+```{r}
+#Perform the variable selection method to sustain the significant variables in the model
+#nullmodel
+nullmodel <- lm(hospdays ~ 1, data = dvisit_newdata)
+summary(nullmodel)
+
+#fullmodel
+fullmodel <- lm(hospdays~., data = dvisit_newdata)
+summary(fullmodel)
+```
+```{r}
+#variable selection - forward
+forward <- step(nullmodel, scope=list(lower=nullmodel, upper=fullmodel), direction="forward")
+```
+
+```{r}
+#variable selection - backward
+backward <- step(fullmodel, data=dvisit_newdata, direction="backward")
+```
+
+```{r}
+#variable selection - both directions
+stepwise <-  step(nullmodel, scope = list(upper=fullmodel), data=dvisit_newdata, direction="both")
+
+```
+
+The lowest AIC value in all the 3 methods turns out to be same(13447.67) and now we will build our regression model with the above variables.
+```{r}
+#model with lowest AIC value
+try_model1  <- lm(hospdays ~   freerepa + actdays + hospadmi+ chcond2 +age+ nondocco+sex+prescrib , data = dvisit_newdata)
+summary(try_model1)
+```
+
+Again remove the insignificant varibles and build the model
+```{r}
+try_model2  <- lm(hospdays ~   freerepa + actdays + hospadmi+ chcond2 +age+ nondocco+sex , data = dvisit_newdata)
+summary(try_model2)
+```
+```{r}
+finalmodel  <- lm(hospdays ~   freerepa + actdays + hospadmi+ chcond2 +age+ nondocco , data = dvisit_newdata)
+summary(finalmodel)
+```
+
+This is the final regression model for predicting the hospdays with respect to other variables in the given dataset.
+
+Q:no:2 - Why is your model a good/reasonable model? Check the constant variance assumption for the errors.
+
+This can be considered as the better model for the following reasons:
+  All the variables are significant with the p value less than 0.05.
+  The adjusted R squared value is 0.8427 ie., 84.2%
+  The standard residual error is 0.2736 which is minimal when compared to all the other model.
+
+Constant Variance Assumption for the eror with the regression diagnostics
+```{r}
+plot(finalmodel)
+```
+
+```{r}
+#test the Breuch Pagan test to formally check presence of heteroscedasticity
+library("lmtest")
+bptest(finalmodel)
+
+```
+
+p value returned from the bptest is < 2.2e-16, so we reject the null hypothesis for constant variance and conclude that there is statistically significant evidence that the variance is not constant and the Residuals Vs Fitted plot shows the non constant variance
+
+```{r}
+plot(finalmodel, which = 1)
+abline(h = 0)
+```
+
+
+Also the plot shows that there is a non-linear relationship with the achieved regression model
+
+Q:NO.3 - Check the normality assumption
+```{r}
+qqnorm(residuals(finalmodel), ylab = "Residuals", main = "QQ Plot")
+qqline(residuals(finalmodel))
+```
+
+
+The points not really falling on a line in the Normal QQ plot, we can coclude that the constant variance assumption cannot be assumed for the errors. so this model suffers from non-constant variance and non-normality of the residuals. 
+
+Q:No.4 - Are the errors correlated?
+```{r}
+res = residuals(finalmodel)
+nres = length(res)
+summary(lm (tail(res,nres-1) ~ head(res, nres-1)))
+```
+
+Here the regression coefficients are non-significant, so this suggests that residuals/errors are not correlated.
+
+Q:No. 5 - Check for leverage points, outliers, influential points.
+
+```{r}
+# calculating leverage points
+lev = hat(model.matrix(finalmodel))
+plot(lev)
+```
+Calculating cook's distance to find outliers and influential points
+```{r}
+library(car)
+r = rstudent(finalmodel)
+cook = cooks.distance(finalmodel)
+plot(finalmodel,pch = 18, col = 'red', which= c(4))
+#gives the maximum points which are outliers
+plot(cook,ylab="Cooks distances")
+points(948,cook[948],col='red')
+dvisit_newdata1 = dvisit_newdata[-948,]
+```
+
+The red data point is most certainly an outlier and has high leverage! The red data point does not follow the general trend of the rest of the data and it also has an extreme x value. And, in this case the red data point is influential. Likewise, we can compute the outliers(965,140) and remove them from the dataset and then create a regression model like the below. 
+
+
+```{r}
+finalmodeltry  <- lm(hospdays ~   freerepa + actdays + hospadmi+ chcond2 +age+ nondocco , data = dvisit_newdata1)
+summary(finalmodeltry)
+```
+
+
+This model with less number of influential points and outliers have given a little better adjusted R squared value than the previous one.
+
+```{r}
+hist(finalmodel$res)
+```
+
+
+Q:No.6 - Check the structure of the relationship btw the predictors and the response
+
+```{r}
+plot(residuals(finalmodel) ~ hospdays,data =dvisit_newdata,  ylab = "Residuals")
+abline(h = 0)
+
+plot(finalmodel, which = 1) # indicates non-linearity
+```
+
+The above plot might look like a positive linear relationship but then we can see that the group of data are accumulated towards the left corner. Also from the plot for Residuals vs fitted , we have noticed that they have non-linearity. So this structure indicates that the relationship is non-linear.

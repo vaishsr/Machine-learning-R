@@ -1,0 +1,490 @@
+---
+title: "Stat_linear_Model"
+author: "Vaishnavi"
+date: "December 19, 2017"
+output: word_document
+---
+
+Submitted By :
+Name : Vaishnavi Sridhar , NetID : vs534
+
+Question 1 :
+
+Fit a model to explain price in terms of the predictors. Perform regression diag-
+nostics to answer the following question. Display any plots that are relavant and
+explain your reasoning. Suggest possible improvements if there are any.
+
+```{r cars}
+stock <- read.csv("stockdata.csv", header = TRUE, sep =",")
+str(stock)
+stock <- stock[,-1]
+summary(stock)
+```
+
+(a) Fit a model to explain price in terms of the predictors. Which variables are
+important, can any of the variables be removed ? Please use F-tests to justify.
+
+```{r}
+pricemodel1 <- lm(price ~ ., data = stock)
+summary(pricemodel1)
+```
+
+The pricemodel1 is a full model with all the predictors included, which shows that all the variables are significant except the 'vol' - volatility of the stock. So remove that 'vol' variable and create the regression model.
+
+```{r}
+pricemodel2 <- lm(price ~ cap.to.gdp + q.ratio + gaap + trailing.pe + avg.allocation , data = stock)
+summary(pricemodel2)
+```
+
+The pricemodel looks better with all the features involved in it are significant with the p value less than 0.05. 
+And its adjusted R squared is 95% which again proves that this is the best model.  F- Test is used to test the overall significance in the regression by judging on multiple coefficients taken together at the same time.
+
+```{r}
+anova( pricemodel2,pricemodel1)
+```
+
+Furthermore, running a more formal F test shows us that we do not have evidence to believe the model including vol is not significantly better than the model excluding it. The p value of 0.5691 is too high to reject the null hypothesis of the models not begin significantly different. We can therefore exclude vol.
+
+(c) Check the constant variance assumption for the errors.
+```{r}
+#test the Breuch Pagan test to formally check presence of heteroscedasticity
+library("lmtest")
+bptest(pricemodel2)
+```
+p value returned from the bptest is  0.7684 > 0.05, so we fail to reject the null hypothesis for constant variance and conclude that there is statistically significant evidence that the variance is constant and the below Residuals Vs Fitted plot proves the constant variance of the errors.
+```{r}
+plot(pricemodel2, which =1)
+abline(h=0)
+```
+
+(d) Check the independentness of the errors assumption.
+    This assumption is particularly important for data that are known to be autocorrelated.
+    
+```{r}
+acf(pricemodel2$residuals)
+```
+The X axis corresponds to the lags of the residual, increasing in steps of 5. The very first line (to the left) shows the correlation of residual with itself (Lag0), therefore, it will always be equal to 1.  Here we can see that the residuals are not auto correlated, which means the independentness of the errors assumption holds true.
+
+```{r}
+res = residuals(pricemodel2)
+nres = length(res)
+summary(lm (tail(res,nres-1) ~ head(res, nres-1)))
+```
+Here the regression coefficients are non-significant, so this also suggests that residuals/errors are independent.
+
+(e) Check the normality assumption
+```{r}
+qqnorm(residuals(pricemodel2), ylab = "Residuals", main = "QQ Plot")
+qqline(residuals(pricemodel2))
+```
+The points are falling on a line in the Normal QQ plot, we can coclude that the normality assumption holds true.
+
+(f) Is nonlinearity a problem?
+
+No. Its not a problem. we can perform polynomial regression
+
+(g) Check for outliers, compute and plot Cook's distance
+
+```{r}
+library(car)
+r = rstudent(pricemodel2)
+cook = cooks.distance(pricemodel2)
+#Cook's distance plot
+plot(pricemodel2,pch = 18, col = 'red', which= c(4))
+#gives the maximum points which are outliers
+plot(cook,ylab="Cooks distances")
+points(85,cook[85],col='red')
+points(9,cook[9],col='red')
+points(36,cook[36],col='red')
+```
+The red data points are most certainly outliers and has high leverage! The red data points does not follow the general trend of the rest of the data and it also has an extreme x value. And, in this case the red data point is influential.So remove them from the dataset and then create a regression model.
+
+(h) Check for influential points.
+
+```{r}
+influencePlot(pricemodel2,	id.method="identify", main="Influence Plot", sub="Circle size is proportial to Cook's Distance" )
+```
+Yes there are influential points that are not following the trend of the data.
+
+(i) The return at time t is defined as
+r(t) = p(t + 1)/p(t)-???? 1
+where p is the price data for day t. Are the returns normally distributed?
+Please justify your answer using Q-Q plots and normality tests.
+
+```{r}
+returns = vector('numeric' , length = 0)
+for(i in 1:99) {
+  returns[i] = (stock$price[i+1] / stock$price[i] - 1)
+}
+
+#check for the distribution:
+
+par(mfrow = c(1,2))
+qqnorm(returns, ylab = "Residuals")
+qqline(returns, col = 'red', lty = 4)
+plot(density(returns), main = "Density Plot")
+```
+From the plots, we can see that the returns are normally distributed.
+
+
+Question 2 :
+Repeat the same question from (a) to (h) on the cheddar dataset (except part
+(i)) from the Faraway package by fitting a model with taste as the response and
+the other three variables as predictors. Answer the questions posed in the rst
+question.
+
+```{r}
+require(faraway)
+data("cheddar")
+str(cheddar)
+summary(cheddar)
+?cheddar
+```
+(a) Fit a model to explain price in terms of the predictors. Which variables are
+important, can any of the variables be removed ? Please use F-tests to justify.
+
+```{r}
+cheddarmodel1 <- lm(taste ~ ., data = cheddar)
+summary(cheddarmodel1)
+```
+Create another model, by removing the insignificant variables "Acetic".
+```{r}
+cheddarmodel2 <- lm(taste ~ H2S+Lactic, data = cheddar)
+summary(cheddarmodel2)
+```
+The variable 'Lactic' can be considered as a significant variable if the threshold of pvalue is considered as 0.05. 
+
+F test justification:
+
+As with the pricemodel regression, here we will run an anova between the cheddar model with Acetic and the model without it. One thing we can note about the two models right off the bat is that there is very little change between their Rsquareds and residual standard errors. Running the anova test gives us:
+```{r}
+
+anova(cheddarmodel2,cheddarmodel1)
+```
+The Anova table shows the P Value of F Statistic 25.26 for DF 2 and 27 is extremely small (< 2.2e-16), i.e smaller that 0.001 so we can reject H0 and say that overall addition of variables is significantly improving the model. Which says that by adding those extra variables we were able to improve the fit of our model significantly. So this can be the best model for predicting the taste of the cheddar based on the other predictor variables.
+
+(c) Check the constant variance assumption for the errors.
+```{r}
+#test the Breuch Pagan test to formally check presence of heteroscedasticity
+library("lmtest")
+bptest(cheddarmodel2)
+```
+p value returned from the bptest is 0.441 which is > 0.05, so we fail to reject the null hypothesis for constant variance and conclude that there is statistically significant evidence that the variance is constant and the below Residuals Vs Fitted plot proves the constant variance of the errors.
+
+```{r}
+plot(cheddarmodel2, which = 1)
+abline(h=0)
+```
+
+(d) Check the independentness of the errors assumption.
+    This assumption is particularly important for data that are known to be autocorrelated.
+  
+```{r}
+acf(cheddarmodel2$residuals)
+```
+The X axis corresponds to the lags of the residual, increasing in steps of 5. The very first line (to the left) shows the correlation of residual with itself (Lag0), therefore, it will always be equal to 1.  Here we can see that the residuals are not auto correlated, which means the independentness of the errors assumption holds true.
+
+```{r}
+resche = residuals(cheddarmodel2)
+nresche = length(resche)
+summary(lm (tail(resche,nresche-1) ~ head(resche, nresche-1)))
+```
+Here the regression coefficients are non-significant, so this also suggests that residuals/errors are independent.
+
+(e) Check the normality assumption
+```{r}
+qqnorm(residuals(cheddarmodel2), ylab = "Residuals", main = "QQ Plot")
+qqline(residuals(cheddarmodel2))
+```
+
+The points are falling on a line in the Normal QQ plot, we can coclude that the normality assumption holds true.
+
+(f) Is nonlinearity a problem?
+
+No. Its not a problem. We ca perform a polynomial regression on the non -linear dataset
+
+(g) Check for outliers, compute and plot Cook's distance
+
+```{r}
+library(car)
+r = rstudent(cheddarmodel2)
+cook = cooks.distance(cheddarmodel2)
+#Cook's distance plot
+plot(cheddarmodel2,pch = 18, col = 'red', which= c(4))
+#gives the maximum points which are outliers
+plot(cook,ylab="Cooks distances")
+points(8,cook[8],col='red')
+points(12,cook[12],col='red')
+points(15,cook[15],col='red')
+```
+
+The red data points are most certainly outliers and has high leverage! The red data points does not follow the general trend of the rest of the data and it also has an extreme x value. And, in this case the red data point is influential.So remove them from the dataset and then create a regression model.
+
+(h) Check for influential points.
+```{r}
+influencePlot(cheddarmodel2,	id.method="identify", main="Influence Plot", sub="Circle size is proportial to Cook's Distance" )
+```
+
+Yes there are influential points that are not following the trend of the data. So a model with outliers removed will act as a better model 
+
+```{r}
+cheddar = cheddar[-8,]
+cheddar = cheddar[-12,]
+cheddar = cheddar[-15,]
+
+cheddarmodel3 <- lm(taste ~ H2S + Lactic, data = cheddar )
+summary(cheddarmodel3)
+```
+This model gave as the R squared value of 74% and includes all the significant variables in it . Plus the F statistics signifies that this model is significant to predict the taste of the cheddar based on the other two predictors.
+
+
+Question 3:
+
+The problem is to discover relation between US new house construction starts data (HOUST) and macro economic indicators: GDP, CPI and Population (POP).Please download the relevant data from the house.zip file provided as an attachment. The description for this data can be found in https://fred.stlouisfed.org/.
+
+(a)	Data preparation: combine all data into an R dataframe object, and construct adummy or factor variable for 4 quarters. First model is HOUST ~ GDP + CPI + quarter.
+
+First, assigned each data point to a quarter out of the year, denoting the quarters as Q1, Q2, Q3, Q4.
+
+```{r}
+econdata<- read.csv("econdata.csv", header = TRUE)
+summary(econdata)
+```
+Create the model:
+```{r}
+econreg<- lm(houst ~ cpi + gdp + as.factor(quarter), data = econdata)
+summary(econreg)
+```
+
+We see that there are 4 observations that were deleted due to missingness. Some of the variables did not have the same data points as the others, so R did not count them. We also note that some variables are not significant. To improve the model we set the intercept equal to zero, and this makes sense because if we have zero GDP and zero CPI, there will probably be zero housing starts as well. Below is the model with an intercept of zero.
+
+```{r}
+econreg1 <- lm(formula = houst ~ 0 + cpi + gdp + as.factor(quarter), data = econdata)
+summary(econreg1)
+```
+
+All of our quarter variables are significant in this model. The R squared has also improved significantly from 0.1782 to 0.9232.
+
+(b)	Use one-way ANOVA to determine whether there is a seasonal effect. Show necessary steps and explanation
+
+First, we ran a strip chart to examine the relationship between housing starts and seasons:
+```{r}
+stripchart(houst ~ as.factor(quarter), vertical= T, pch = 19, data= econdata, xlab = "Quarter" , ylab = "Houst", method = "jitter", jitter = 0.04)
+```
+
+It appears from the chart that there is a slight relationship between housing starts the varying seasons. To further understand the structure of our fitted model econreg, we run an anova:
+```{r}
+anova(econreg1)
+```
+
+Based on our low p value of the F statistic, we can reject the null hypothesis that the population means for housing starts per season are all equal. Seasonality has an effect on housing starts.
+
+Before we confirm this interpretation we must examine our plots to ensure validity in our model.
+
+The first plot is to determine whether there is heteroskedasticity. Plotting the residuals against the fitted values we find:
+```{r}
+plot(econreg1, which = 1)
+```
+
+Though we may express a bit of concern due to the slight variability of the chart as the fitted values increase, we are comfortable with the result.
+
+Next we check the normality of the residuals:
+```{r}
+plot(econreg1, which = 2)
+```
+
+We can see that there is a bit of skewness in our normality chart, but it still looks pretty good. To further examine this skewness we can plot a histogram of the residuals:
+```{r}
+econresid<- rstandard(econreg1)
+hist(econresid)
+
+```
+
+There does seem to be a bit of a leftward skew in the data, but nothing to be too concerned about. We can determine that there is a significant seasonal effect on housing.
+
+(c)	For the construction of a 10% confidence interval, we can use Tukey's test to examine the effects of each season comparatively:
+
+```{r}
+TukeyHSD(aov(econreg1), conf.level = .9)
+```
+
+We can see the biggest difference lies between Q2 and Q1, and we are able to reject the null hypothesis that there is no difference between Q2 and Q1. For the others, the p values are too large to reject.
+
+(d)	Add population to the first model and redo b and c
+
+Adding population to the model we have:
+```{r}
+econregA<- lm(houst ~  cpi + gdp + pop + as.factor(quarter), data = econdata)
+summary(econregA)
+
+```
+
+As before, we will set our intercept equal to zero.
+```{r}
+econregB<- lm(houst ~ 0 +  cpi + gdp + pop + as.factor(quarter), data = econdata)
+summary(econregB)
+
+```
+
+We actually find that population is not a significant variable in this regression. Let us continue with our ANOVA test to examine any differences.
+```{r}
+anova(econregB)
+```
+
+Based on our low p value of the F statistic, we can reject the null hypothesis that the population means for housing starts per season are all equal. Seasonality has an effect on housing starts.
+
+Before we confirm this interpretation we must examine our plots to ensure validity in our model.
+
+The first plot is to determine whether there is heteroskedasticity. Plotting the residuals against the fitted values we find:
+```{r}
+plot(econregB, which = 1) 
+```
+
+Similiarly we do not find heteroskedasticity to be a major issue here. On to our normality analysis:
+```{r}
+plot(econregB, which = 2)
+```
+
+And we see that the residuals are fairly normally distributed. 
+
+For the construction of a 10% confidence interval, we can use Tukey's test to examine the effects of each season comparatively:
+```{r}
+TukeyHSD(aov(econregB), conf.level = .9)
+```
+
+We find that the largest difference is between Q1 and Q2, but after adding population to our model, we fail to reject the null hypothesis that there is no significant difference between these two seasons, or any other two for that matter.
+
+
+Question 4:
+
+Read the train-default.csv and test-default.csv files in R which contains training and test data containing information on ten thousand customers. The aim here is to predict which customers will default on their credit card debt.
+
+```{r}
+trainingcard <- read.csv("train-default.csv", header = TRUE, sep = ",")
+str(trainingcard)
+trainingcard <- trainingcard[, -1]
+summary(trainingcard)
+```
+
+(a) Fit a logistic regression model with the default as the response and the variable balance as the predictor. Make sure that predictor variable in your model is significant. Perform regression diagnostics on this model to answer the following questions. Display any plots that are relevant.
+
+```{r}
+#creating the model
+cardModel1 <- glm(default ~ 0+balance, data = trainingcard, family = binomial(link ='logit'))
+summary(cardModel1)
+```
+The Model has the AIC value of 4015.3 and the predictor variable 'balance' is significant.
+Let us try another modelwith intercept as 0
+```{r}
+cardModel2 <- glm(default ~ balance, data = trainingcard, family = binomial(link ='logit'))
+summary(cardModel2)
+```
+Here the value of AIC - 912.69 seems to be lower than the model 1. Therefore this model can be relied upon
+
+
+Regression Diagnostics of the regression model:
+```{r}
+par(mfrow = c(1,2))
+plot(cardModel2)
+```
+Errors have non constant varaince and there is no need of checking normality for the logistic regression.
+
+(b)Why is your model a good/reasonable model? Check the AIC and pseudo-R2
+   values.
+ The AIC value of 912.69 is low with the balance being the most significant variable. 
+ Pseudo R squared calculation is as follows.
+```{r}
+#creating the null model
+null_modelcard <- glm(default ~1, family = "binomial", data =trainingcard )
+PseudoRSquared = 1 - (logLik(cardModel2)/logLik(null_modelcard))
+PseudoRSquared
+```
+
+Pseudo R2 is 0.47. So it's reasonable to predict which customers will default on their credit card debt.
+
+(c) Give an interpretation of the regression coefficients (in words).
+
+A unit increase in balance, increase the log odds by 5.669e-03 is the nterpretation of the regression coefficient 'balance'.
+
+(d) Form the confusion matrix over the test data. What percentage of the time, are your predictions correct?
+
+```{r}
+testingcard <- read.csv("test-default.csv", header = TRUE, sep =",")
+
+```
+Predicting on the test data
+
+```{r}
+library(caret)
+library(InformationValue)
+
+prediction = predict(cardModel2, newdata=testingcard, type = 'response')
+pred = rep(0, length(prediction))
+pred[prediction >0.02] <- 1
+
+accuracytest = table(pred, testingcard$default)
+accuracytest
+
+sum(diag(accuracytest))/ sum(accuracytest)
+```
+
+From the above output, we can see that 83 % of times, our prediction turned to be correct.
+
+(e)	Add variables income and student to the model. 
+```{r}
+cardModel3<- glm(default ~  balance + income + student, data= trainingcard, family =binomial(link ='logit'))
+summary(cardModel3)
+```
+
+The AIC for cardModel 3 is exactly the same with or without the intercept. They both also have the same pseudoRSquared of 0.4805.
+
+Model has to be created with excluding the insignificant variables
+```{r}
+cardModel4<- glm(default ~  balance + student, data= trainingcard, family =binomial(link ='logit'))
+summary(cardModel4)
+```
+
+Now this seems to be a better model with all the significant vaiables in it and AIC is 901.23
+
+A unit increase in balance, increase the log odds by  0.005902, holding the other variable as constant and same will be repeated for the other varaible  unit's i 0.005902, keeping the rest of the variable as constant, decreses the log probability by -0.694833. This is the interpretation of all the regression coefficients. 
+
+Confusion Matrix:
+```{r}
+prediction = predict(cardModel3, newdata=testingcard, type = 'response')
+pred = rep(0, length(prediction))
+pred[prediction >0.02] <- 1
+
+accuracytest = table(pred, testingcard$default)
+accuracytest
+
+sum(diag(accuracytest))/ sum(accuracytest)
+
+```
+
+Here also, we can see that 84% of the times, our prediction remains true.
+
+(f)	What is the estimated probability of default for a student with a credit card balance of 2000 and income of 40,000.
+
+Per our model and using the formula p=e^y/(1+e^y ) we calculate a 99.99% probability that a student with balance= 2000 and income = 40000 will default.
+The probability of a non student with the same balance and income defaulting is also 99.99%
+
+(g) Are the variables student and balance are correlated? If yes, why do you think this is the case? If no, please explain.
+
+To find the correlation between the categorical varaible and the numerical varible, by doing a heterogenous correlation matrix and then focus on their p values.
+```{r}
+str(trainingcard)
+data <- trainingcard[, c(2,3)]
+library(polycor)
+hetcor(data)
+
+```
+
+The p value says that these two variables (student, balance) are highly correlated as they are less than 0.05 signficance level.
+
+(h) (Extra Credit) Does the data say that it is more likely for a student to default
+compared to a non-student for different values of income level? Please com-
+ment. In other words, if you were the credit card company, would you prefer
+students as customers or non-students as customers with the same income
+level?
+
+As per the analysis,  students are very often perdicted as defaulters like more than approximately 80% of the times. So if we are the credit card company, we will not be prefering the students as customers.
